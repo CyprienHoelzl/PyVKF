@@ -45,9 +45,9 @@ def vkf(y,fs,f,p=None,bw=None,multiorder=None,solver='scipy-spsolve'):
     solver : 'scikits-spsolve' (faster) or 'scipy-spsolve' (slower)
     Returns
     -------
-    x : Arry, complex envelope(s)
-    c : Array, phasor(s) c
-    r : Array, selectivity(s)
+    x : Arry, complex envelope[s]
+    c : Array, phasor[s] c
+    r : Array, selectivity[s]
 
 
     References: 
@@ -91,7 +91,7 @@ def vkf(y,fs,f,p=None,bw=None,multiorder=None,solver='scipy-spsolve'):
     #Signal
     n_t = len(y)
     
-    #Frequency vector(s)
+    #Frequency vector[s]
     (n_f, n_ord) = f.shape
     if n_f == 1:
         f1 = np.ones(n_t,1)*f
@@ -160,7 +160,6 @@ def vkf(y,fs,f,p=None,bw=None,multiorder=None,solver='scipy-spsolve'):
         den = den + 2*q[0,qi]*np.cos((qi)*phi)
     r = np.sqrt(num/den)
 
-
     if (den <= 0).any() | (r > (np.sqrt(1/(2*q[0,0]*np.finfo(float).eps)))).any():
         raise Warning('Ill-conditioned B-matrix selectivity bandwidth is too small.')
 
@@ -217,9 +216,6 @@ def vkf(y,fs,f,p=None,bw=None,multiorder=None,solver='scipy-spsolve'):
         #Free memory
         del diags_B, B, BB_D, BB_U, ii_U, jj_U, cc_U    
     
-    #     BB = BB.astype(np.complex64)
-    
-    # B = B.astype(np.complex64)
     #%% Solve)
     if silent==False:
         print('Solving sparse Ax=b, as single precision complex')
@@ -260,6 +256,9 @@ def lil_repeat(S, repeat):
     return new
 
 
+
+###############################################################################
+
 ###############################################################################
 if __name__ == '__main__' :
     #%%   Demo:
@@ -270,41 +269,48 @@ if __name__ == '__main__' :
     #   Example:
     import matplotlib.pyplot as plt
     import time
+    import matplotlib
     fs = 12000
     T = 50
     dt = 1/fs
-    t = np.linspace(0,(T),np.int64((T-dt)/dt+1)).transpose()
+    t = np.arange(0,(T)+dt,dt).transpose()
     N = t.size
   
     # Instationary component 0
-    A0 = 2*np.hstack([np.linspace(0.5,1,np.floor(N/2).astype(np.int64())), np.linspace(1,0.5,np.ceil(N/2).astype(np.int64()))])
-    f0 = (0.2*fs - 0.1*fs*np.cos(4*np.pi*t/T)).reshape(-1,1)
-    phi0 = 2*np.pi*np.cumsum(f0)*dt+3*t/max(t)
+    A0 = 2*np.hstack([np.linspace(0.5,1,np.floor(N).astype(np.int64()))])#0.02*t+1
+    #,np.linspace(1,0.5,np.ceil(N/2).astype(np.int64()))])
+    f0 = (fs/16 - fs/100*np.cos(2*np.pi*1.5*t/T)).reshape(-1,1)
+    phase0=3*t/max(t)-2
+    phi0 = 2*np.pi*np.cumsum(f0)*dt+phase0
     y0 = A0*np.cos(phi0)
+        
     # Instationary component 1
-    A1 = np.hstack([np.linspace(0.5,1,np.floor(N/2).astype(np.int64())), np.linspace(1,0.5,np.ceil(N/2).astype(np.int64()))])
-    f1 = (0.2*fs - 0.1*fs*np.cos(np.pi*t/T)).reshape(-1,1)
-    phi1 = 2*np.pi*np.cumsum(f1)*dt
+    A1 = 0.7+(0.4*np.cos(t*0.04*np.pi*2)*np.sin(t*0.02*np.pi*2))
+    #np.hstack([np.linspace(0.5,1,np.floor(N/2).astype(np.int64())), np.linspace(1,0.5,np.ceil(N/2).astype(np.int64()))])
+    f1 = (fs/50 - fs/100*np.cos(2*np.pi*t/T/2)).reshape(-1,1)
+    phase1 = np.zeros(N)
+    phi1 = 2*np.pi*np.cumsum(f1)*dt+phase1
     y1 = A1*np.cos(phi1)
     
     # Stationary component
-    As1 = np.ones(N)
-    fs1 = 0.2*fs*np.ones((N,1))
-    phis1 = 2*np.pi*np.cumsum(fs1)*dt
-    ys1 = As1*np.sin(phis1)
+    As1 = 1*np.ones(N)
+    fs1 = 500*np.ones((N,1))
+    phaseS1=np.ones(N)*-1
+    phis1 = 2*np.pi*np.cumsum(fs1)*dt+phaseS1  #or equiv:(2*np.pi*fs1.T*t).flatten()+phaseS1
+    ys1 = As1*np.cos(phis1)
   
     # White noise
-    e = 1.5*np.random.rand(np.size(y1))
+    e = 1/0.28875*(np.random.rand(np.size(y1))-0.5)*0.75
   
     # Mixed signal
     y = y0+ y1 + ys1 + e
   
     # Perform VKF on periodic components
     p = 2
-    bw = fs/12000
+    bw = fs/12000*1.5
     t1=time.time()
     (x,c,r) = vkf(y,fs,np.hstack([f0, f1, fs1]),p=p,bw=bw)
-    print('elaspsed time: {}'.format(time.time()-t1))
+    print('elapsed time: {}'.format(time.time()-t1))
     xreal = np.real(x*c)
   
     # # Reveal white noise
@@ -313,18 +319,219 @@ if __name__ == '__main__' :
     # Amplitude and Phase
     Amplitude = np.abs(x)
     Phase = np.log(x).imag
-  
-    # # Plot
-    fig,ax = plt.subplots(nrows=3)
+    #%
+    # import tikzplotlib
+    import cycler
+    matplotlib.rcParams.update({'font.family':'serif','font.serif':'Times New Roman','font.size':11,'legend.fontsize':10,
+                                'text.usetex': False,
+                                'mathtext.default': 'regular',
+                                'text.latex.preamble':r"\usepackage{lmodern}"})#'font.family':'Serif',"font.sans-serif": ["Modern"]
+    # colors = matplotlib.cm.get_cmap('Dark2',5)
+    def makecolormap(colorcount = 4):
+        steps = np.arange(0,2+2/(colorcount/2-1),2/(colorcount/2-1))
+        colorlist = ([plt.cm.Reds(0.2+.4*(i/6*2)) for i in steps] + 
+                    [plt.cm.Blues(0.2 +.4*(i/6*2)) for i in steps])
+        return  colorlist
+    #%% Spectrogram
+    matplotlib.rcParams['axes.prop_cycle'] = cycler.cycler('color',makecolormap(3))
+    fig,ax = plt.subplots(nrows=1,sharex=True,figsize=[5.39749, 1.1], dpi=300)
+    ax= [ax]
     ax[0].specgram(y,round(fs/16),Fs=fs)
-    ax[1].plot(t,np.vstack((A0,A1,As1)).T,'--')
-    ax[1].plot(t,Amplitude)
-    ax[1].set_xlim([min(t),max(t)])
-    ax[2].plot(t,Phase)
-    ax[2].set_xlim([min(t),max(t)])
-    ax[2].set_xlabel('Time (s)')
-    ax[1].set_ylabel('Amplitude')
-    ax[2].set_ylabel('Phase')
-    ax[1].legend(['S1','S2','Ss1'],loc='upper right')
-    ax[2].legend(['S1','S2','Ss1'],loc='upper right')
+    # ax[0].plot(t,As1,'k', linewidth = 1, label = '$X_{theory}$')
+    # ax[0].plot(t,np.hstack([f0, fs1, f1]),linestyle='--', dashes=(3, 3), label = ['$X_1$', '$X_2$','$X_3$'], 
+    #            colors =makecolormap(colorcount = 4)[1])
+    ax[0].plot(t,f0,linestyle='--', dashes=(3, 3), label = ['$X_1$'],  color =makecolormap(colorcount = 3)[1])
+    ax[0].plot(t,fs1,linestyle='--', dashes=(3, 3), label = ['$X_3$'], color =makecolormap(colorcount = 3)[2])
+    ax[0].plot(t,f1,linestyle='--', dashes=(3, 3), label = ['$X_2$'],  color =makecolormap(colorcount = 3)[3])
+    ax[0].set_xlim([min(t),max(t)])
+    ax[0].set_ylim([0,1000])
+    ax[0].set_yticks((0, 500, 1000))
+    ax[0].set_yticklabels([0,0.5,1])
+    ax[0].set_ylabel('$f$ (kHz)')
+    ax[0].set_xticklabels([])
+    ax[0].yaxis.set_label_coords(-0.07,0.5)
+    fig.savefig('TimeSeries_Synthetic_Specgram.pdf')
+    #%% Amplitude
+    fig,ax = plt.subplots(nrows=1,sharex=True,figsize=[5.39749,1.4], dpi=300)
+    ax= [ax]
+    
+    ax[0].plot(t,Amplitude[:,0], label = '$X_1$',  color =makecolormap(colorcount = 3)[1])
+    ax[0].plot(t,Amplitude[:,2], label = '$X_3$', color =makecolormap(colorcount = 3)[2])
+    ax[0].plot(t,Amplitude[:,1], label = '$X_2$',  color =makecolormap(colorcount = 3)[3])
+    
+    ax[0].plot(t,np.vstack((A0,As1,A1)).T,'k',linestyle='--', dashes=(3, 3), linewidth = 1,label='_nolegend_')
+    ax[0].plot(t,As1,'k',linestyle='--', dashes=(3, 3), linewidth = 1, label = '$X_{theory}$')
+    
+    ax[0].legend([ax[0].get_legend_handles_labels()[0][ax[0].get_legend_handles_labels()[1].index(i)]  for i in ['$X_1$', '$X_2$','$X_3$',
+                                                                                                           '$X_{theory}$']],
+                 ['$X_1[k]$', '$X_2[k]$','$X_3[k]$','$X_{theory}$'],
+               loc='lower left',
+               bbox_to_anchor=(0., 1.08, 1., .102), ncol=4, mode="expand", borderaxespad=0.)
+    box = ax[0].get_position()
+    ax[0].set_position([box.x0, box.y0, box.width, box.height-(box.height-box.y0)*0.25])
+    ax[0].set_xticklabels([])
+    ax[0].set_ylabel('$A_n[k]$ (m/s$^2$)')
+    ax[0].set_xlim([min(t),max(t)])
+    ax[0].set_yticks([0,1,2])
+    ax[0].yaxis.set_label_coords(-0.07,0.5)
+    fig.savefig('TimeSeries_Synthetic_Amplitude.pdf')
+    #%% Phase
+    fig,ax = plt.subplots(nrows=1,sharex=True,figsize=[5.39749, 1.4], dpi=300)
+    ax= [ax]
+    
+    ax[0].plot(t,Phase[:,0], label = '$X_1$',  color =makecolormap(colorcount = 3)[1])
+    ax[0].plot(t,Phase[:,2], label = '$X_3$', color =makecolormap(colorcount = 3)[2])
+    ax[0].plot(t,Phase[:,1], label = '$X_2$',  color =makecolormap(colorcount = 3)[3])
+    
+    ax[0].plot(t,np.vstack((phase0,phaseS1,phase1)).T,'k',linestyle='--', dashes=(3, 3), linewidth = 1, label = ['$X_1$', '$X_2$','$X_3$'])
+        
+    ax[0].set_xlim([min(t),max(t)])
+    ax[0].set_xlabel('$kT_s$ (s)')
+    ax[0].set_ylabel('$\\theta_n[k]$ (rad)')
+    ax[0].set_yticks([-2,-1,0,1])
+    ax[0].yaxis.set_label_coords(-0.07,0.5)
+    ax[0].set_ylim(-2,1)
+    box = ax[0].get_position()
+    ax[0].set_position([box.x0, box.y0+(box.height-box.y0)*0.35, box.width, box.height-(box.height-box.y0)*0.35])
+    
+    fig.savefig('TimeSeries_Synthetic_Phase.pdf')
+    #%%% Time series plot
+    fig2,ax2 = plt.subplots(nrows=1,figsize=[5.39749, 2.5], dpi=300)
+    ax = [ax2]
+    ax[0].plot(t,y,label='$y=X_1+X_2+X_3+\eta$',color ='k',linestyle = '-')
+    # ax[0].plot(t,y,label='$X_{theory}$',color ='k',linestyle = '--', dashes=(3,4))
+    ax[0].plot(t,xreal.sum(axis=1),label='$X_1+X_2+X_3$')#,color ='k')
+    # ax[0].plot(t,y0+ y1 + ys1,label='x$=$S1+S2+$X_3$')
+    ax[0].plot(t,xreal[:,0],label='$X_1$')
+    ax[0].plot(t,xreal[:,2],label='$X_3$')
+    ax[0].plot(t,xreal[:,1],label='$X_2$')
+    ax[0].set_xlim([min(t),max(t)])
+    ax[0].set_ylabel('$A$ (m/s$^2$)')
+    ax[0].set_xlabel('$kT_s$ (s)')
+    
+    ax[0].yaxis.set_label_coords(-0.07,0.5)
+    ax[0].legend([ax[0].get_legend_handles_labels()[0][ax[0].get_legend_handles_labels()[1].index(i)]  for i in ['$y=X_1+X_2+X_3+\eta$','$X_1+X_2+X_3$',
+                                                                                                                 '$X_1$', '$X_2$','$X_3$']],
+               ['$y[k]$','$y_{filt}[k]$','$X_1[k]$', '$X_2[k]$','$X_3[k]$'],
+               loc='lower left',
+               bbox_to_anchor=(0., 1.05, 1., .102), ncol=5, mode="expand", borderaxespad=0.)
+    box = ax[0].get_position()
+    ax2.set_position([box.x0, box.y0+0.1, box.width, box.height-(box.height-box.y0)*0.28])
+    fig2.savefig('Properties_Synthetic.pdf')    
+
+    #%%% Time series plot zoomed
+    fig2,ax = plt.subplots(nrows=1,figsize=[5.39749, 1.8], dpi=300)
+    ax = [ax]
+    
+    ax[0].plot(t,y,color = 'k',linewidth = 1, label='_nolegend_')
+    ax[0].plot(t,xreal.sum(axis=1),label='$X_1+X_2+X_3$')
+    ax[0].plot(t,xreal[:,0],label='$X_1$')
+    ax[0].plot(t,xreal[:,2],label='$X_3$')
+    ax[0].plot(t,xreal[:,1],label='$X_2$')
+    ax[0].plot(t,y0,color = 'k',linewidth = 1,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    ax[0].plot(t,y1,color = 'k',linewidth = 1,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    ax[0].plot(t,ys1,color = 'k',linewidth = 1,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    ax[0].plot(t,y0+ y1 + ys1,'k',linewidth = 1,linestyle = '--',dashes=(3,4), label='x$=$S1+S2+$X_3$')
+    ax[0].set_xlim([31.995,32.0])
+    ax[0].set_ylim([-4,4])
+    ax[0].set_ylabel('$A$ (m/s$^2$)')
+    ax[0].set_xlabel('$kT_s$ (s)')
+    ax[0].yaxis.set_label_coords(-0.07,0.5)
+    ax[0].ticklabel_format(useOffset=False)
+    box = ax[0].get_position()
+    ax[0].set_position([box.x0, box.y0+0.15, box.width, box.height-0.15])
+    
+    fig2.savefig('Properties_Synthetic_zoomed.pdf') 
+    #%%% Time series plot zoomed: y shown
+    fig2,ax = plt.subplots(nrows=1,figsize=[5.39749, 1.8], dpi=300)
+    ax = [ax]
+    
+    ax[0].plot(t,y,color = 'k',linewidth = 1, label='$y[k]$')
+    ax[0].plot(t,xreal.sum(axis=1),label='$y_{filt}[k]$')
+    ax[0].plot(t,y0,color = 'k',linewidth = 0,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    ax[0].plot(t,y1,color = 'k',linewidth = 0,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    ax[0].plot(t,ys1,color = 'k',linewidth = 0,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    ax[0].plot(t,y0+ y1 + ys1,'k',linewidth = 1,linestyle = '--',dashes=(3,4), label='$y_{theo}[k]$')
+    ax[0].set_xlim([31.995,32.0])
+    ax[0].set_ylim([-5,5])
+    ax[0].set_ylabel('$A$ (m/s$^2$)')
+    ax[0].set_xlabel('$kT_s$ (s)')
+    ax[0].yaxis.set_label_coords(-0.07,0.5)
+    ax[0].ticklabel_format(useOffset=False)
+    
+    ax[0].legend([ax[0].get_legend_handles_labels()[0][ax[0].get_legend_handles_labels()[1].index(i)]  for i in ['$y[k]$','$y_{filt}[k]$','$y_{theo}[k]$']],
+               ['$y[k]$','$y_{filt}[k]$','$y_{theo}[k]$'],
+               loc='lower left',
+               bbox_to_anchor=(0., 1.05, 1., .102), ncol=5, mode="expand", borderaxespad=0.)
+    box = ax[0].get_position()
+    ax[0].set_position([box.x0, box.y0+0.15, box.width, box.height-0.25])
+    fig2.savefig('Properties_Synthetic_zoomed2.pdf') 
+    #%% Time series plot zoomed: X shown
+    fig2,ax = plt.subplots(nrows=1,figsize=[5.39749, 1.8], dpi=300)
+    ax = [ax]
+    
+    # ax[0].plot(t,y,color = 'k',linewidth = 1, label='_nolegend_')
+    # ax[0].plot(t,xreal.sum(axis=1),label='$X_1+X_2+X_3$')
+    ax[0].plot(t,xreal[:,0],label='$X_1$',color = makecolormap(colorcount = 3)[1])
+    ax[0].plot(t,xreal[:,2],label='$X_3$',color = makecolormap(colorcount = 3)[2])
+    ax[0].plot(t,xreal[:,1],label='$X_2$',color = makecolormap(colorcount = 3)[3])
+    ax[0].plot(t,y0,color = 'k',linewidth = 1,linestyle = '--', dashes=(3,4), label='$X_{i,theo}$')
+    ax[0].plot(t,y1,color = 'k',linewidth = 1,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    ax[0].plot(t,ys1,color = 'k',linewidth = 1,linestyle = '--', dashes=(3,4), label='_nolegend_')
+    # ax[0].plot(t,y0+ y1 + ys1,'k',linewidth = 1,linestyle = '--',dashes=(3,4), label='x$=$S1+S2+$X_3$')
+    ax[0].set_xlim([31.995,32.0])
+    ax[0].set_ylim([-2,2])
+    ax[0].set_ylabel('$A$ (m/s$^2$)')
+    ax[0].set_xlabel('$kT_s$ (s)')
+    ax[0].yaxis.set_label_coords(-0.07,0.5)
+    ax[0].ticklabel_format(useOffset=False)
+    
+    ax[0].legend([ax[0].get_legend_handles_labels()[0][ax[0].get_legend_handles_labels()[1].index(i)]  for i in ['$X_1$', '$X_2$','$X_3$','$X_{i,theo}$']],
+               ['$X_1[k]$', '$X_2[k]$','$X_3[k]$','$X_{i,theo}$'],
+               loc='lower left',
+               bbox_to_anchor=(0., 1.05, 1., .102), ncol=5, mode="expand", borderaxespad=0.)    
+    box = ax[0].get_position()
+    ax[0].set_position([box.x0, box.y0+0.15, box.width, box.height-0.25])
+    
+    fig2.savefig('Properties_Synthetic_zoomed3.pdf') 
+    #%% Test different bandwidths     
+    # Mixed signal
+    y = y0+ y1 + ys1 + e
   
+    # Perform VKF on periodic components
+    plist = [1,2]
+    bwlist = [fs/12000*np.linspace(0.1,2.5,11),
+              fs/12000*np.linspace(1,2.5,11)]
+    mse=[]
+    for p in plist:
+        mse1=[]
+        for bw in bwlist[p-1]:
+            t1=time.time()
+            (x,c,r) = vkf(y,fs,np.hstack([f0, f1, fs1]),p=p,bw=bw)
+            print('elapsed time: {}'.format(time.time()-t1))
+            xreal = np.real(x*c)
+    
+            # Reveal white noise
+            w = y-np.sum(xreal,1) 
+            # Error MSE
+            y_true= y0+ y1 + ys1 
+            # MSE:
+            mse2 = np.mean((y_true - np.sum(xreal,1))**2)
+            mse1.append(mse2)
+            print('MSE: ', mse2)
+        mse.append(mse1)
+    #%% Plot parvar
+    fig = plt.figure(figsize=[4.8,1.8], dpi=300)
+    for i in plist:
+        plt.plot(bwlist[i-1],mse[i-1],'x-',label='VKF Order='+str(i))
+    for ax in fig.get_axes():
+        for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels()):
+            item.set_fontsize(11)
+    plt.xlabel('VKF Bandwidth [Hz]')
+    plt.ylabel('MSE')
+    plt.legend(loc='upper center')
+    plt.tight_layout()
+    fig.get_axes()[0].set_position([box.x0*1.2, box.y0, box.width * 0.65, box.height])
+    plt.legend(loc='upper left',
+                 bbox_to_anchor=(1.02, 1))
+    plt.savefig('MSE_Synthetic.pdf')    
