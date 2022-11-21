@@ -5,7 +5,6 @@ Vold-Kalman Filter was introduced by Håvard Vold and Jan Leuridan in 1993. VKF 
 
 VKF is adapted for filtering signals from rotary equipments components such as bearings and axles, where the frequency components are known and the signal is corrupted by noise. PyVKF has been successfully used to filter signals [4] from Axle Box Accelerometers on Railway vehicles for filtering effects originating from vehicle and trakc
 
-![alt text](https://github.com/CyprienHoelzl/PyVKF/blob/master/VKF_Example.png)
 # Issues or Questions
 If you have comments, you can write an issue at GitHub so that everyone can read it along with my response. Please don't view it as a way to report bugs only. 
 
