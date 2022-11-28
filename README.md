@@ -11,7 +11,7 @@ The VKF is proposed for decomposing the signal into periodic wheel and track rel
 * Install the requirements using:
 
 ```
-(VKF)$ pip install -r /path/to/requirements.txt
+(VKF)$ pip install -r requirements.txt
 ```
 
 * Run the demo: [VKF Demo on synthetic data](VoldKalmanFilter.py).
