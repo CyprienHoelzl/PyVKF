@@ -193,7 +193,7 @@ def vkf(y,fs,f,p=None,bw=None,multiorder=None,solver='scipy-spsolve'):
 
         ii_U = np.zeros((n_t,bl_U))
         jj_U = np.zeros((n_t,bl_U))
-        cc_U = np.zeros((n_t,bl_U),dtype = np.float64)
+        cc_U = np.zeros((n_t,bl_U),dtype = np.complex128)
         m = 0
         
         #Upper-diagonal part
@@ -201,14 +201,14 @@ def vkf(y,fs,f,p=None,bw=None,multiorder=None,solver='scipy-spsolve'):
             for kj in range((ki+1),n_ord):
                 ii_U[:,m] = (ki)*n_t + np.arange(0,n_t)
                 jj_U[:,m] = (kj)*n_t + np.arange(0,n_t)
-                cc_U[:,m] = np.real(np.conj(c[:,ki])*c[:,kj])
+                cc_U[:,m] = np.conj(c[:,ki])*c[:,kj]
                 m = m + 1
 
         #Construct sparse upper-diagonal part
         BB_U = sparse.csr_matrix((cc_U.flatten(),(ii_U.flatten(),jj_U.flatten())),shape=(nn,nn))
         
         #Assemble sparse matrix
-        BB = BB_D + BB_U + BB_U.transpose()
+        BB = BB_D + BB_U + BB_U.getH()
 
         #Construct right-hand side
         cy = (np.conj(c.T.reshape(-1,1)).T*np.tile(y,(n_ord))).T
